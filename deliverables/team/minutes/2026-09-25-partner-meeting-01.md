@@ -48,16 +48,6 @@
 - Use Jira timelines to divide tasks
 - Only take high-impact tasks if you can deliver production-quality code
 
-## Action items
-
-| What                              | Who      | When           |
-| --------------------------------- | -------- | -------------- |
-| Send repo access + docs           | GenLedge | After NDA step |
-| Fork repo into CSC301 org         | TODO     | After access   |
-| Share minutes with absent members | Addison  | TODO           |
-| Coordinate split with other team  | TODO     | TODO           |
-| Write user stories in Jira        | Team     | TODO           |
-
 ## Open questions
 
 - NDA: course says no NDA, only written confidentiality acknowledgement → confirm with Salman + GenLedge
