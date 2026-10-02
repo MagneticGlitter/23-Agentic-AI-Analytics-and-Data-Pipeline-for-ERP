@@ -1,8 +1,6 @@
 # CSC301 Deliverable 1 [Planning.md](http://Planning.md)
 
-# GenLedge Agentic Analytics - Deliverable 1 Plan
-
-> **Status key:** `[NEEDS CONFIRMATION]` marks information that was not established in the available meeting notes. User stories, architecture details, and mitigations marked as proposed are working drafts for review with GenLedge and the other CSC301 team. Update this document as decisions are made.
+# GenLedge: Agentic AI Analytics & Data Pipeline for ERP - Deliverable 1 Plan
 
 ## Product Details
 
@@ -261,4 +259,83 @@ In our Oct 1 meeting, Kulwant said GenLedge's goal is a working autonomous data 
 
 
 ## Potential Risks
+
+### Q13: What are some potential risks to your project?
+
+1. **The interface with the pipeline team at the data warehouse isn't agreed in detail.** Everything our engine reads, the pipeline writes. The pipeline team is building it from scratch, so the table names, columns and keys don't exist yet and will change during the term. Without an agreement, we either hardcode one client's schema or ship reports that break silently when a table changes. GenLedge has also left open whether both teams share one agent harness. If we share it without clear ownership, one team's change could break the other's agent. If we build two, we duplicate work.
+2. **Pipeline data can be wrong in ways that make our numbers wrong.**  
+The pipeline is new, so early loads may have bugs: duplicate rows when a load is re-run, missing loads, or values converted inconsistently. In a payout report, a job loaded twice is a commission paid twice, and an agent presenting that number confidently is worse than no report. We don't control the fix.
+3. **Our scope is ours to define, and GenLedge cares most about the agent harness.**  
+GenLedge didn't choose a first report or a success target for us. Kulwant told us to build the engine first and set our own targets. If we aim too big, we finish nothing; if we aim too small, the harness is never tested on real reporting logic. He also said he cares most about the agent harness, not the UI or backend, so time spent polishing screens is time not spent on what GenLedge values.
+4. **The agent can produce an analysis that looks right and isn't.**  
+A wrong join, filter or date range still returns a plausible number, and the same question can get different answers on different runs. GenLedge wants reports people can trust, and a payout report decides what people get paid. Without a way to check each result, nobody can tell a wrong report from a right one.
+5. **Client data could leak across clients or to the model.**
+  - Across clients. Reports are client-facing, and the warehouse holds data for many clients. An agent that writes SQL could query another client's data if the database allows it, and a prompt instruction is not a security boundary.
+  - To the model. An agent that explains results has to see real results (names, amounts, commissions), and GenLedge hasn't set a policy on what customer data the model can see.
+6. **The stack is ours to choose, and the data store is an open question.**
+
+- Kulwant told us to pick whatever stack works best for our part. Postgres is the only decision GenLedge has made, and he said we can challenge it: relational databases are good for analytics, but whether they suit agentic analytics is still open. In our Oct 1 meeting he added that Node.js and Python are both fine at our scale and we shouldn't spend long debating.
+- Changing the data store would affect the pipeline team too, since they own the warehouse (Q7).
+- GenLedge prefers AWS but isn't requiring it, so where we host and test is also our decision.
+- We still have to choose between Node.js and Python and how reports are displayed (QuickSight was suggested in GenLedge's project description but isn't required). Debating these too long takes time away from the agent harness.
+
+1. **The NDA/IP question is unresolved, so we have no repository access or real data, and GenLedge can't use our code yet.**  
+GenLedge can't share its code or customer data unless we sign an NDA/IP agreement, and can share only part of its schemas. The course handout says partners can't require us to sign, and we are waiting on Professor David. GenLedge also can't use our code unless the NDA/IP question is resolved.
+
+### Q14: What are some potential mitigation strategies for the risks you identified?
+
+1. **Boundary.** Our Technical Lead drafts a one-page interface agreement with the pipeline team, and both teams and GenLedge approve it. Proposed terms:
+
+- The pipeline owns all table creation and loading.
+- We get read-only access to the warehouse and to a table catalogue the pipeline team maintains (descriptions, columns, keys).
+- Our agent reads the catalogue at runtime instead of hardcoding names.
+- The pipeline team flags breaking changes in the shared WhatsApp group before merging them.
+- The two teams hold a short sync every two weeks.
+- The agreement settles whether the two teams share one agent harness or build separate ones (GenLedge has no preference). If shared, it says who owns which parts and how changes to it are reviewed.
+- Both teams present harness research at the next partner meeting, so we compare our proposals with theirs beforehand and don't present two that conflict.
+
+On our side, each report records which tables and columns it depends on. A missing column then produces a clear error, not a wrong number.
+
+1. **Upstream data.** Before calculating anything, our engine checks its input:
+
+- duplicate rows on the table's row key,
+- when the table was last loaded successfully,
+- how many rows the table holds.
+
+If a check fails, the report shows a warning or refuses to calculate. We will ask the pipeline team to make loads safe to re-run, so a second run updates rows instead of duplicating them. We won't demo money figures until that is fixed or our duplicate check is in place.
+
+1. **Scope.** We follow Kulwant's advice: build the agent harness and engine first, then reports on top.
+
+- Our first report is a monthly cash-flow summary on synthetic data, the flow our prototype already shows. GenLedge's three report types (Q3) come after the engine works.
+- We present our harness research and proposed architecture at the next partner meeting, and post it in the WhatsApp group a day before.
+- We use coding agents for UI and backend work, as GenLedge recommended, to keep most of our time for the harness.
+
+1. **Wrong but plausible results.** Make every result checkable:
+
+- Each report shows the calculation in plain language, the query behind it, and the tables and row counts used.
+- The user can drill into the rows behind any number.
+- Agent-written queries are checked before they run: read-only, limited to the caller's data, and capped in rows.
+- We build an evaluation set: synthetic data with known correct totals, a list of standard requests, and a script that compares the agent's numbers to the known answers. It runs on every PR that changes the agent.
+- When a query fails a check or the agent reports low confidence, the result goes to a person instead of straight to the user.
+
+1. **Client isolation and data sent to the model.**
+
+- Enforce isolation in the database, not the prompt: one read-only database role per client, limited to that client's data.
+- The client is resolved on the server from the signed-in session, never taken from the model or the request.
+- Until GenLedge sets a policy, the model sees schemas, aggregates and small samples, not full result sets.
+- Every route we add checks the session and the client.
+
+1. **Platform.**
+
+- Pick Node.js or Python at our next team sync. GenLedge said either works and not to spend long on it.
+- Test early whether Postgres suits agentic analytics by running the agent's queries against our synthetic dataset. If it doesn't, propose an alternative to GenLedge and the pipeline team together, since they own the warehouse.
+- Keep all data access in one module, so changing the data store later stays contained.
+- Keep the reporting interface behind our own API, so the choice of reporting tool doesn't force a rewrite of the engine.
+
+1. **Data and access.**
+
+- Build a synthetic or public transactions dataset with known correct totals, as GenLedge suggested. Once the pipeline team can load files, load it through their pipeline so it has the same shape as real pipeline output.
+- Ask Kulwant for the partial schema guidance he offered, so our synthetic tables look like GenLedge's.
+- Build in our own private repository with GenLedge's PR process, and move it into GenLedge's if the NDA/IP question is resolved.
+- Don't agree to any NDA/IP option, in writing or out loud, until Professor David responds. Kulwant pointed out that any agreement is binding.
 
